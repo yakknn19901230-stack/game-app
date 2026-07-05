@@ -167,28 +167,35 @@ html, body {
 
 .touch-btn {
   pointer-events: auto;
-  width: 70px;
-  height: 70px;
+  width: 84px;
+  height: 84px;
   border-radius: 50%;
   border: none;
-  font-size: 24px;
+  font-size: 28px;
   font-weight: bold;
   color: #fff;
   background: rgba(255, 255, 255, 0.22);
   backdrop-filter: blur(4px);
   user-select: none;
   -webkit-user-select: none;
+  touch-action: none;
 }
 
-.touch-btn:active {
+.touch-btn:active,
+.touch-btn.pressed {
   background: rgba(255, 255, 255, 0.45);
 }
 
 .touch-jump {
-  width: 90px;
-  height: 90px;
-  font-size: 18px;
+  width: 104px;
+  height: 104px;
+  font-size: 20px;
   background: rgba(255, 107, 107, 0.5);
+}
+
+.touch-jump:active,
+.touch-jump.pressed {
+  background: rgba(255, 107, 107, 0.8);
 }
 
 /* ---------- 縦持ちヒント ---------- */

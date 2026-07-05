@@ -217,23 +217,41 @@ document.addEventListener("touchend", (e) => {
   lastTouchEnd = now;
 }, { passive: false });
 
-function bindTouch(id, key) {
-  const el = document.getElementById(id);
-  const down = (e) => {
-    e.preventDefault();
-    unlockAudio();
-    if (key === "jump" && !keys.jump) jumpPressed = true;
-    keys[key] = true;
-  };
-  const up = (e) => { e.preventDefault(); keys[key] = false; };
-  el.addEventListener("pointerdown", down);
-  el.addEventListener("pointerup", up);
-  el.addEventListener("pointerleave", up);
-  el.addEventListener("pointercancel", up);
+// ---------- タッチ操作(マルチタッチ対応) ----------
+// ボタンごとに個別のイベントで処理すると、iOSで「移動しながらジャンプ」の
+// ような同時押しを取りこぼすことがある。そこで、画面に触れている全部の指の
+// 位置を毎回ボタンの位置と照合して、押されているボタンを判定する。
+const touchControlsEl = document.getElementById("touch-controls");
+const touchButtons = ["left", "right", "jump"].map((key) => ({
+  key,
+  el: document.getElementById("touch-" + key),
+}));
+const TOUCH_MARGIN = 24; // 指が多少ズレても反応させる余白(px)
+
+function handleTouches(e) {
+  e.preventDefault();
+  unlockAudio();
+  const pressed = { left: false, right: false, jump: false };
+  for (const t of e.touches) {
+    for (const b of touchButtons) {
+      const r = b.el.getBoundingClientRect();
+      if (
+        t.clientX >= r.left - TOUCH_MARGIN && t.clientX <= r.right + TOUCH_MARGIN &&
+        t.clientY >= r.top - TOUCH_MARGIN && t.clientY <= r.bottom + TOUCH_MARGIN
+      ) {
+        pressed[b.key] = true;
+      }
+    }
+  }
+  if (pressed.jump && !keys.jump) jumpPressed = true;
+  for (const b of touchButtons) {
+    keys[b.key] = pressed[b.key];
+    b.el.classList.toggle("pressed", pressed[b.key]);
+  }
 }
-bindTouch("touch-left", "left");
-bindTouch("touch-right", "right");
-bindTouch("touch-jump", "jump");
+["touchstart", "touchmove", "touchend", "touchcancel"].forEach((type) => {
+  touchControlsEl.addEventListener(type, handleTouches, { passive: false });
+});
 
 // ---------- レベル初期化 ----------
 function initLevel() {
@@ -756,12 +774,18 @@ function drawEnemies() {
 function drawPlayer() {
   const p = player;
   const cx = p.x + p.w / 2;
+  const feetY = p.y + p.h;
   const dying = gameState === STATE.DYING;
   const blink = dying && Math.floor(p.deadTimer / 4) % 2 === 0;
   if (blink) return;
 
+  // 当たり判定はそのままに、見た目だけ足元を基準に拡大して描く
+  const S = 1.35;
+
   ctx.save();
-  ctx.translate(cx, p.y);
+  ctx.translate(cx, feetY);
+  ctx.scale(S, S);
+  ctx.translate(0, -p.h);
   if (p.facing < 0) ctx.scale(-1, 1);
 
   const legSwing = p.onGround && Math.abs(p.vx) > 0.3 ? Math.sin(p.runFrame * 2) * 7 : 0;
@@ -805,20 +829,23 @@ function drawPlayer() {
   ctx.restore();
 
   // 頭(顔) - 反転させずに描く(顔写真が裏返ると変なので)
-  const headR = 15;
-  const headY = p.y + headR - 4;
+  // 顔がゲームの主役なので大きめに。11 = 拡大前の頭中心の足元からの高さ(p.h - (15 - 4))
+  const headR = 15 * S;
+  const headY = feetY - (p.h - 11) * S;
   drawFaceCircle(ctx, cx, headY, headR);
 
-  // 帽子
+  // 帽子: 顔が隠れないよう、頭のてっぺんに乗る細いキャップにする
   ctx.save();
   ctx.translate(cx, headY);
   if (p.facing < 0) ctx.scale(-1, 1);
   ctx.fillStyle = "#e63946";
   ctx.beginPath();
-  ctx.arc(0, -2, headR + 1, Math.PI, 0);
+  ctx.arc(0, 0, headR + 2, Math.PI + 0.45, -0.45);
+  ctx.closePath();
   ctx.fill();
+  // つば
   ctx.beginPath();
-  ctx.roundRect(2, -8, headR + 8, 6, 3);
+  ctx.roundRect(headR * 0.45, -headR * 0.85, headR * 1.05, headR * 0.3, 4);
   ctx.fill();
   ctx.restore();
 }
