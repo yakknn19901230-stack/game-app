@@ -20,25 +20,27 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 // ---------- レベルマップ ----------
-// # : 地面(草)   = : 地面(土)   B : レンガ   ? : ハテナブロック(コイン)
-// M : ハテナブロック(キノコ入り。見た目は?と同じ)
-// P : 土管       o : コイン     g : 敵       F : ゴールの旗
-// (空白は何もなし)
+// # : 地面(草)   = : 地面(土)   B : レンガ(下から叩くと壊せる)
+// ? : ハテナブロック(コイン)   M : ハテナブロック(キノコ入り。見た目は?と同じ)
+// S : 石ブロック(壊せない足場)  P : 土管   o : コイン   g : 敵
+// F : ゴールの旗   C : ゴールの城(かざり)
+// ※ このマップは scratchpad/mapgen.js で生成し、全ブロック・コインに
+//    届くこと、詰む地形がないことを機械的に検証してある
 const MAP_SOURCE = [
-"                                                                                                                                                                        ",
-"                                                                                                                                                                        ",
-"                                                                                                                                                                        ",
-"                                                        o o o                                                                       ooo                                 ",
-"                                                       BB?BB                                                    B?B?B                                                   ",
-"                                                                                                                                 BBBB                                   ",
-"                  ?                                                        oo             oo                                                            o               ",
-"                                              o o                        BBBB    M      BBBB                            o o                            BBB           F  ",
-"          o                                 B?BB?B                                                                    BBBBB          g                              BBB ",
-"       BBMBB            PP        g              g        PP        g   g        PP            g   g      PP    o                PP       PP     g  g          o        ",
-"                 g      PP      PP PP                     PP                     PP                       PP   BBB      g        PP  o    PP                            ",
-"####################  ######  ###########################################  ############################################  ##############################################",
-"####################  ######  ###########################################  ############################################  ##############################################",
-"####################  ######  ###########################################  ############################################  ##############################################",
+"                                                                                                                                                                            ",
+"                                                                                                                                                                            ",
+"                                                                                                                                                                            ",
+"                                                                                                                                                                            ",
+"                                                                                                                                          ooo                               ",
+"                           ooo                                      M                                   ooo                                                     F           ",
+"                                                                                   ooo                                                                                      ",
+"                                                                   g    oo        BB?BB                                                  BB?BB                              ",
+"                          BB?BB                   oooo            BB?BB                                B?B?B                          SS        oo                          ",
+"       BBMBB      oo              PP    B?B?B                 PP              PP                  PP          ooooo       PP        SSSS                    oo              ",
+"              PP g                PP  g       g          PP g PP          PP  PP             g g  PP            g     PPg PP      SSSSSS              g g            C      ",
+"######################  ############################  ##################################  ####################################  ################  ##########################",
+"######################  ############################  ##################################  ####################################  ################  ##########################",
+"######################  ############################  ##################################  ####################################  ################  ##########################",
 ];
 
 // 行の長さをそろえてタイル配列に変換する
@@ -49,7 +51,7 @@ let tiles = [];
 const WORLD_W = MAP_COLS * TILE;
 const WORLD_H = MAP_ROWS * TILE;
 
-const SOLID = new Set(["#", "=", "B", "?", "M", "U", "P"]);
+const SOLID = new Set(["#", "=", "B", "?", "M", "U", "P", "S"]);
 
 // ---------- ゲーム状態 ----------
 const STATE = { TITLE: 0, PLAYING: 1, DYING: 2, GAMEOVER: 3, CLEAR: 4 };
@@ -683,6 +685,17 @@ function draw() {
     clearTimer++;
     ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.25, clearTimer / 200)})`;
     ctx.fillRect(0, 0, W, H);
+    // その場ですぐ「ゴール!」と分かるように大きく表示する
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "bold 72px sans-serif";
+    const bounce = Math.sin(clearTimer * 0.1) * 6;
+    ctx.fillStyle = "rgba(0,0,0,0.4)";
+    ctx.fillText("🚩 ゴール!", W / 2 + 4, H / 2 - 40 + bounce + 4);
+    ctx.fillStyle = "#ffd166";
+    ctx.fillText("🚩 ゴール!", W / 2, H / 2 - 40 + bounce);
+    ctx.restore();
   }
 }
 
@@ -787,6 +800,50 @@ function drawTiles() {
           ctx.strokeRect(x + 1.5, y + 1.5, TILE - 3, TILE - 3);
           break;
         }
+        case "S": {
+          // 石ブロック(壊せない足場)。レンガと見分けがつくグレーにする
+          ctx.fillStyle = "#a8a8b0";
+          ctx.fillRect(x, y, TILE, TILE);
+          ctx.strokeStyle = "#6e6e78";
+          ctx.lineWidth = 3;
+          ctx.strokeRect(x + 1.5, y + 1.5, TILE - 3, TILE - 3);
+          ctx.fillStyle = "rgba(255,255,255,0.35)";
+          ctx.fillRect(x + 5, y + 5, TILE - 10, 8);
+          ctx.fillStyle = "rgba(0,0,0,0.15)";
+          ctx.fillRect(x + 8, y + 26, 12, 8);
+          ctx.fillRect(x + 28, y + 30, 10, 7);
+          break;
+        }
+        case "C": {
+          // ゴールの城(かざり・当たり判定なし)
+          const gy = y + TILE; // 地面の上面
+          const cw = TILE * 4, chh = TILE * 3.4;
+          const cx0 = x - TILE * 1.5;
+          ctx.fillStyle = "#d9d0c0";
+          ctx.fillRect(cx0, gy - chh, cw, chh);
+          // 城壁の凸凹
+          ctx.fillStyle = "#c4b8a4";
+          for (let i = 0; i < 5; i++) {
+            ctx.fillRect(cx0 + i * (cw / 5) + 4, gy - chh - 14, cw / 5 - 8, 14);
+          }
+          // 窓とドア
+          ctx.fillStyle = "#5b4636";
+          ctx.beginPath();
+          ctx.arc(cx0 + cw / 2, gy - 28, 22, Math.PI, 0);
+          ctx.rect(cx0 + cw / 2 - 22, gy - 28, 44, 28);
+          ctx.fill();
+          ctx.fillRect(cx0 + 22, gy - chh + 24, 18, 24);
+          ctx.fillRect(cx0 + cw - 40, gy - chh + 24, 18, 24);
+          // てっぺんの旗
+          ctx.fillStyle = "#e63946";
+          ctx.fillRect(cx0 + cw / 2 - 2, gy - chh - 44, 4, 30);
+          ctx.beginPath();
+          ctx.moveTo(cx0 + cw / 2 + 2, gy - chh - 44);
+          ctx.lineTo(cx0 + cw / 2 + 30, gy - chh - 36);
+          ctx.lineTo(cx0 + cw / 2 + 2, gy - chh - 28);
+          ctx.fill();
+          break;
+        }
         case "P": {
           const isTop = tileAt(tx, ty - 1) !== "P";
           const isLeft = tileAt(tx - 1, ty) !== "P";
@@ -811,22 +868,35 @@ function drawTiles() {
           break;
         }
         case "F": {
+          const poleH = TILE * (MAP_ROWS - 3 - ty); // 地面まで届くポール
+          const px = x + TILE / 2;
+          // 土台
+          ctx.fillStyle = "#a8a8b0";
+          ctx.fillRect(x + 4, y + poleH - 14, TILE - 8, 14);
+          ctx.strokeStyle = "#6e6e78";
+          ctx.lineWidth = 3;
+          ctx.strokeRect(x + 5.5, y + poleH - 12.5, TILE - 11, 11);
           // 旗ざお
           ctx.fillStyle = "#3fbf4f";
-          ctx.fillRect(x + TILE / 2 - 3, y, 6, TILE * (MAP_ROWS - 3 - ty));
+          ctx.fillRect(px - 4, y, 8, poleH - 12);
           ctx.beginPath();
-          ctx.arc(x + TILE / 2, y, 10, 0, Math.PI * 2);
+          ctx.arc(px, y, 12, 0, Math.PI * 2);
           ctx.fillStyle = "#ffd166";
           ctx.fill();
-          // 旗
-          const wave = Math.sin(frameCount * 0.08) * 4;
+          // 大きな旗
+          const wave = Math.sin(frameCount * 0.08) * 5;
           ctx.fillStyle = "#e63946";
           ctx.beginPath();
-          ctx.moveTo(x + TILE / 2 + 3, y + 14);
-          ctx.lineTo(x + TILE / 2 + 46 + wave, y + 34);
-          ctx.lineTo(x + TILE / 2 + 3, y + 54);
+          ctx.moveTo(px + 4, y + 14);
+          ctx.lineTo(px + 72 + wave, y + 42);
+          ctx.lineTo(px + 4, y + 70);
           ctx.closePath();
           ctx.fill();
+          ctx.fillStyle = "#fff";
+          ctx.font = "bold 20px sans-serif";
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          ctx.fillText("GOAL", px + 10, y + 42);
           break;
         }
       }
