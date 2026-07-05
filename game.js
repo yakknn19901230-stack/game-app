@@ -20,7 +20,8 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 // ---------- レベルマップ ----------
-// # : 地面(草)   = : 地面(土)   B : レンガ   ? : ハテナブロック
+// # : 地面(草)   = : 地面(土)   B : レンガ   ? : ハテナブロック(コイン)
+// M : ハテナブロック(キノコ入り。見た目は?と同じ)
 // P : 土管       o : コイン     g : 敵       F : ゴールの旗
 // (空白は何もなし)
 const MAP_SOURCE = [
@@ -31,9 +32,9 @@ const MAP_SOURCE = [
 "                                                       BB?BB                                                    B?B?B                                                   ",
 "                                                                                                                                 BBBB                                   ",
 "                  ?                                                        oo             oo                                                            o               ",
-"                                              o o                        BBBB    ?      BBBB                            o o                            BBB           F  ",
-"          o                                 B?BB?B                                                        PP          BBBBB          g                              BBB ",
-"       BB?BB            PP        g              g        PP        g   g        PP            g   g      PP    o                PP       PP     g  g          o        ",
+"                                              o o                        BBBB    M      BBBB                            o o                            BBB           F  ",
+"          o                                 B?BB?B                                                                    BBBBB          g                              BBB ",
+"       BBMBB            PP        g              g        PP        g   g        PP            g   g      PP    o                PP       PP     g  g          o        ",
 "                 g      PP      PP PP                     PP                     PP                       PP   BBB      g        PP  o    PP                            ",
 "####################  ######  ###########################################  ############################################  ##############################################",
 "####################  ######  ###########################################  ############################################  ##############################################",
@@ -48,13 +49,13 @@ let tiles = [];
 const WORLD_W = MAP_COLS * TILE;
 const WORLD_H = MAP_ROWS * TILE;
 
-const SOLID = new Set(["#", "=", "B", "?", "U", "P"]);
+const SOLID = new Set(["#", "=", "B", "?", "M", "U", "P"]);
 
 // ---------- ゲーム状態 ----------
 const STATE = { TITLE: 0, PLAYING: 1, DYING: 2, GAMEOVER: 3, CLEAR: 4 };
 let gameState = STATE.TITLE;
 
-let player, enemies, coins, particles, popups;
+let player, enemies, coins, particles, popups, items;
 let flagCols = new Set(); // ゴールの旗がある列
 let camera = { x: 0, y: 0 };
 let score = 0, coinCount = 0, lives = START_LIVES, timeLeft = TIME_LIMIT;
@@ -182,6 +183,9 @@ const sfx = {
   die:   () => { beep(494, 0.12); setTimeout(() => beep(392, 0.12), 120); setTimeout(() => beep(262, 0.4), 240); },
   clear: () => { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, 0.2, "square", 0.12), i * 130)); },
   bump:  () => beep(160, 0.08, "square", 0.1),
+  sprout: () => beep(220, 0.3, "sine", 0.15, 440),
+  power: () => { [392, 494, 587, 784].forEach((f, i) => setTimeout(() => beep(f, 0.12, "square", 0.12), i * 80)); },
+  shrink: () => { [587, 440, 294].forEach((f, i) => setTimeout(() => beep(f, 0.12, "square", 0.12), i * 80)); },
 };
 
 // ---------- BGM (WebAudioで生成する8bit風ループ曲・オリジナル) ----------
@@ -315,6 +319,7 @@ function initLevel() {
   coins = [];
   particles = [];
   popups = [];
+  items = [];
 
   flagCols = new Set();
   for (let ty = 0; ty < MAP_ROWS; ty++) {
@@ -343,6 +348,8 @@ function initLevel() {
     deadTimer: 0,
     jumpBuffer: 0, // 先行入力: 着地直前に押したジャンプを覚えておくフレーム数
     coyote: 0,     // コヨーテタイム: 足場を離れた直後でもジャンプできるフレーム数
+    big: false,    // キノコで大きくなった状態(1回だけダメージに耐えられる)
+    invuln: 0,     // ダメージ後の無敵時間(フレーム)
   };
   camera.x = 0;
   camera.y = Math.max(0, WORLD_H - canvas.height);
@@ -407,7 +414,16 @@ function moveAndCollide(body) {
 // ---------- ブロックを下から叩いたとき ----------
 function bumpBlock(tx, ty) {
   const ch = tileAt(tx, ty);
-  if (ch === "?") {
+  if (ch === "M") {
+    // キノコ入りブロック: 叩くとキノコが飛び出して歩き出す
+    tiles[ty][tx] = "U";
+    score += 200;
+    sfx.sprout();
+    items.push({
+      x: tx * TILE + 4, y: ty * TILE - 40,
+      w: 40, h: 40, vx: 1.5, vy: 0, taken: false,
+    });
+  } else if (ch === "?") {
     tiles[ty][tx] = "U";
     coinCount++;
     score += 200;
@@ -429,7 +445,19 @@ function bumpBlock(tx, ty) {
   }
 }
 
-// ---------- プレイヤー死亡 ----------
+// ---------- プレイヤーのダメージ・死亡 ----------
+// 大きいときは1回だけ耐えて小さくなる。小さいときはミス。
+function damagePlayer() {
+  if (player.invuln > 0) return;
+  if (player.big) {
+    player.big = false;
+    player.invuln = 120;
+    sfx.shrink();
+  } else {
+    killPlayer();
+  }
+}
+
 function killPlayer() {
   if (gameState !== STATE.PLAYING) return;
   gameState = STATE.DYING;
@@ -466,6 +494,8 @@ function update() {
   }
 
   if (gameState !== STATE.PLAYING) return;
+
+  if (player.invuln > 0) player.invuln--;
 
   // タイマー
   if (frameCount % 60 === 0) {
@@ -535,10 +565,11 @@ function update() {
     if (Math.abs(e.x - player.x) > canvas.width * 1.2) continue;
 
     e.hitWall = false;
+    const prevVx = e.vx; // moveAndCollideが壁でvxを0にするため、反転用に覚えておく
     e.vy += GRAVITY;
     if (e.vy > 16) e.vy = 16;
     moveAndCollide(e);
-    if (e.hitWall) e.vx = -e.vx;
+    if (e.hitWall) e.vx = -prevVx;
 
     // プレイヤーとの当たり判定
     if (rectsOverlap(player, e)) {
@@ -552,9 +583,29 @@ function update() {
         sfx.stomp();
         popups.push({ x: e.x + e.w / 2, y: e.y, vy: -3, life: 25, type: "score", text: "300" });
       } else {
-        killPlayer();
-        return;
+        damagePlayer();
+        if (gameState !== STATE.PLAYING) return;
       }
+    }
+  }
+
+  // --- キノコの更新と取得 ---
+  for (const it of items) {
+    if (it.taken) continue;
+    it.hitWall = false;
+    const prevVx = it.vx;
+    it.vy += GRAVITY;
+    if (it.vy > 16) it.vy = 16;
+    moveAndCollide(it);
+    if (it.hitWall) it.vx = -prevVx;
+    if (it.y > WORLD_H + 100) { it.taken = true; continue; }
+
+    if (rectsOverlap(player, it)) {
+      it.taken = true;
+      score += 500;
+      sfx.power();
+      popups.push({ x: it.x + it.w / 2, y: it.y, vy: -3, life: 35, type: "score", text: "パワーアップ!" });
+      player.big = true;
     }
   }
 
@@ -619,6 +670,7 @@ function draw() {
 
   drawTiles();
   drawCoins();
+  drawItems();
   drawEnemies();
   if (gameState !== STATE.TITLE) drawPlayer();
   drawParticles();
@@ -800,6 +852,37 @@ function drawCoins() {
   }
 }
 
+function drawItems() {
+  for (const it of items) {
+    if (it.taken) continue;
+    const cx = it.x + it.w / 2;
+    // 軸(顔の部分)
+    ctx.fillStyle = "#ffe8c9";
+    ctx.beginPath();
+    ctx.roundRect(it.x + 7, it.y + it.h * 0.45, it.w - 14, it.h * 0.5, 6);
+    ctx.fill();
+    // 目
+    ctx.fillStyle = "#333";
+    ctx.beginPath();
+    ctx.arc(cx - 6, it.y + it.h * 0.68, 2.5, 0, Math.PI * 2);
+    ctx.arc(cx + 6, it.y + it.h * 0.68, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    // カサ
+    ctx.fillStyle = "#e63946";
+    ctx.beginPath();
+    ctx.arc(cx, it.y + it.h * 0.5, it.w / 2, Math.PI, 0);
+    ctx.closePath();
+    ctx.fill();
+    // カサの白い模様
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(cx, it.y + it.h * 0.16, 5, 0, Math.PI * 2);
+    ctx.arc(cx - 12, it.y + it.h * 0.38, 4, 0, Math.PI * 2);
+    ctx.arc(cx + 12, it.y + it.h * 0.38, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 function drawEnemies() {
   for (const e of enemies) {
     if (!e.alive && e.squashTimer <= 0) continue;
@@ -852,9 +935,12 @@ function drawPlayer() {
   const dying = gameState === STATE.DYING;
   const blink = dying && Math.floor(p.deadTimer / 4) % 2 === 0;
   if (blink) return;
+  // ダメージ後の無敵時間中は点滅させる
+  if (p.invuln > 0 && Math.floor(frameCount / 4) % 2 === 0) return;
 
   // 当たり判定はそのままに、見た目だけ足元を基準に拡大して描く
-  const S = 1.35;
+  // キノコを取って大きいときはさらに大きく
+  const S = p.big ? 1.8 : 1.35;
 
   ctx.save();
   ctx.translate(cx, feetY);
