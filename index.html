@@ -32,11 +32,14 @@
       <button class="btn btn-ghost" id="face-reset">デフォルトに戻す</button>
     </div>
 
-    <button class="btn btn-primary" id="start-btn">ゲームスタート</button>
+    <div class="level-select">
+      <button class="btn btn-easy" id="start-easy-btn">🌱 かんたん<span class="btn-sub">3さいから・おちる穴なし</span></button>
+      <button class="btn btn-primary" id="start-normal-btn">🔥 ぼうけん<span class="btn-sub">穴や敵がいっぱい</span></button>
+    </div>
 
     <div class="howto">
-      <p>← → / A D … 移動　　スペース / ↑ / W … ジャンプ</p>
-      <p>敵は上から踏んでたおそう！ コインを集めてゴールの旗を目指せ！</p>
+      <p>← → / A D … 移動　　スペース / ↑ / W … ジャンプ　　X / Z … ファイアボール</p>
+      <p>敵は上から踏んでたおそう！ ハテナブロックからキノコ・フラワー・スターが出るよ！</p>
     </div>
   </div>
 
@@ -66,6 +69,7 @@
       <button class="touch-btn" id="touch-right">▶</button>
     </div>
     <div class="touch-right">
+      <button class="touch-btn touch-fire hidden-btn" id="touch-fire">🔥</button>
       <button class="touch-btn touch-jump" id="touch-jump">JUMP</button>
     </div>
   </div>

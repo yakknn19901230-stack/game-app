@@ -21,12 +21,38 @@ const ctx = canvas.getContext("2d");
 
 // ---------- レベルマップ ----------
 // # : 地面(草)   = : 地面(土)   B : レンガ(下から叩くと壊せる)
-// ? : ハテナブロック(コイン)   M : ハテナブロック(キノコ入り。見た目は?と同じ)
+// ? : ハテナブロック(コイン)   M : キノコ入り   W : フラワー入り   T : スター入り
 // S : 石ブロック(壊せない足場)  P : 土管   o : コイン   g : 敵
 // F : ゴールの旗   C : ゴールの城(かざり)
-// ※ このマップは scratchpad/mapgen.js で生成し、全ブロック・コインに
-//    届くこと、詰む地形がないことを機械的に検証してある
-const MAP_SOURCE = [
+// ※ マップは scratchpad/mapgen.js で生成し、全要素に届くこと・
+//    詰む地形がないことを機械的に検証してある
+const LEVELS = {
+  easy: {
+    name: "かんたん",
+    time: 400,
+    enemySpeed: 0.6, // 小さい子向けに敵はゆっくり
+    map: [
+"                                                                                                              ",
+"                                                                                                              ",
+"                                                                                                              ",
+"                                                                                                              ",
+"                                                                                                              ",
+"                                                                                                    F         ",
+"                                                                                                              ",
+"                                                                          ooo                                 ",
+"                           ooooo                              ooooo                                           ",
+"      ?M?   oooo      BTB             B?B?B   oooo      ?W?                S      ?M?   oooo                  ",
+"                  PP              g                 PP                g   SSS                 g          C    ",
+"##############################################################################################################",
+"##############################################################################################################",
+"##############################################################################################################",
+    ],
+  },
+  normal: {
+    name: "ぼうけん",
+    time: 300,
+    enemySpeed: 1.1,
+    map: [
 "                                                                                                                                                                            ",
 "                                                                                                                                                                            ",
 "                                                                                                                                                                            ",
@@ -35,29 +61,32 @@ const MAP_SOURCE = [
 "                           ooo                                      M                                   ooo                                                     F           ",
 "                                                                                   ooo                                                                                      ",
 "                                                                   g    oo        BB?BB                                                  BB?BB                              ",
-"                          BB?BB                   oooo            BB?BB                                B?B?B                          SS        oo                          ",
-"       BBMBB      oo              PP    B?B?B                 PP              PP                  PP          ooooo       PP        SSSS                    oo              ",
+"                          BB?BB                   oooo            BB?BB                                BTB?B                          SS        oo                          ",
+"       BBMBB      oo              PP    BWB?B                 PP              PP                  PP          ooooo       PP        SSSS                    oo              ",
 "              PP g                PP  g       g          PP g PP          PP  PP             g g  PP            g     PPg PP      SSSSSS              g g            C      ",
 "######################  ############################  ##################################  ####################################  ################  ##########################",
 "######################  ############################  ##################################  ####################################  ################  ##########################",
 "######################  ############################  ##################################  ####################################  ################  ##########################",
-];
+    ],
+  },
+};
+let currentLevel = "normal";
 
-// 行の長さをそろえてタイル配列に変換する
-const MAP_COLS = Math.max(...MAP_SOURCE.map(r => r.length));
-const MAP_ROWS = MAP_SOURCE.length;
+// レベルによってサイズが変わるため initLevel() で設定する
+let MAP_SOURCE = LEVELS.normal.map;
+let MAP_COLS = 0;
+let MAP_ROWS = 0;
 let tiles = [];
+let WORLD_W = 0;
+let WORLD_H = 0;
 
-const WORLD_W = MAP_COLS * TILE;
-const WORLD_H = MAP_ROWS * TILE;
-
-const SOLID = new Set(["#", "=", "B", "?", "M", "U", "P", "S"]);
+const SOLID = new Set(["#", "=", "B", "?", "M", "W", "T", "U", "P", "S"]);
 
 // ---------- ゲーム状態 ----------
 const STATE = { TITLE: 0, PLAYING: 1, DYING: 2, GAMEOVER: 3, CLEAR: 4 };
 let gameState = STATE.TITLE;
 
-let player, enemies, coins, particles, popups, items;
+let player, enemies, coins, particles, popups, items, fireballs;
 let flagCols = new Set(); // ゴールの旗がある列
 let camera = { x: 0, y: 0 };
 let score = 0, coinCount = 0, lives = START_LIVES, timeLeft = TIME_LIMIT;
@@ -188,6 +217,8 @@ const sfx = {
   sprout: () => beep(220, 0.3, "sine", 0.15, 440),
   power: () => { [392, 494, 587, 784].forEach((f, i) => setTimeout(() => beep(f, 0.12, "square", 0.12), i * 80)); },
   shrink: () => { [587, 440, 294].forEach((f, i) => setTimeout(() => beep(f, 0.12, "square", 0.12), i * 80)); },
+  star:  () => { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => setTimeout(() => beep(f, 0.1, "square", 0.12), i * 60)); },
+  fire:  () => beep(620, 0.12, "sawtooth", 0.1, -260),
 };
 
 // ---------- BGM (WebAudioで生成する8bit風ループ曲・オリジナル) ----------
@@ -246,22 +277,28 @@ function stopBgm() {
 }
 
 // ---------- 入力 ----------
-const keys = { left: false, right: false, jump: false };
+const keys = { left: false, right: false, jump: false, fire: false };
 let jumpPressed = false; // 押した瞬間だけtrue
+let firePressed = false;
 
 window.addEventListener("keydown", (e) => {
-  if (["ArrowLeft", "ArrowRight", "ArrowUp", "Space", "KeyA", "KeyD", "KeyW"].includes(e.code)) e.preventDefault();
+  if (["ArrowLeft", "ArrowRight", "ArrowUp", "Space", "KeyA", "KeyD", "KeyW", "KeyX", "KeyZ"].includes(e.code)) e.preventDefault();
   if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = true;
   if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = true;
   if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") {
     if (!keys.jump) jumpPressed = true;
     keys.jump = true;
   }
+  if (e.code === "KeyX" || e.code === "KeyZ") {
+    if (!keys.fire) firePressed = true;
+    keys.fire = true;
+  }
 });
 window.addEventListener("keyup", (e) => {
   if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = false;
   if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = false;
   if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") keys.jump = false;
+  if (e.code === "KeyX" || e.code === "KeyZ") keys.fire = false;
 });
 
 // iOS Safariのピンチズーム・ダブルタップズームを防ぐ
@@ -283,7 +320,7 @@ document.addEventListener("touchend", (e) => {
 // ような同時押しを取りこぼすことがある。そこで、画面に触れている全部の指の
 // 位置を毎回ボタンの位置と照合して、押されているボタンを判定する。
 const touchControlsEl = document.getElementById("touch-controls");
-const touchButtons = ["left", "right", "jump"].map((key) => ({
+const touchButtons = ["left", "right", "jump", "fire"].map((key) => ({
   key,
   el: document.getElementById("touch-" + key),
 }));
@@ -292,7 +329,7 @@ const TOUCH_MARGIN = 24; // 指が多少ズレても反応させる余白(px)
 function handleTouches(e) {
   e.preventDefault();
   unlockAudio();
-  const pressed = { left: false, right: false, jump: false };
+  const pressed = { left: false, right: false, jump: false, fire: false };
   for (const t of e.touches) {
     for (const b of touchButtons) {
       const r = b.el.getBoundingClientRect();
@@ -305,6 +342,7 @@ function handleTouches(e) {
     }
   }
   if (pressed.jump && !keys.jump) jumpPressed = true;
+  if (pressed.fire && !keys.fire) firePressed = true;
   for (const b of touchButtons) {
     keys[b.key] = pressed[b.key];
     b.el.classList.toggle("pressed", pressed[b.key]);
@@ -316,12 +354,19 @@ function handleTouches(e) {
 
 // ---------- レベル初期化 ----------
 function initLevel() {
+  const lv = LEVELS[currentLevel];
+  MAP_SOURCE = lv.map;
+  MAP_COLS = Math.max(...MAP_SOURCE.map(r => r.length));
+  MAP_ROWS = MAP_SOURCE.length;
+  WORLD_W = MAP_COLS * TILE;
+  WORLD_H = MAP_ROWS * TILE;
   tiles = MAP_SOURCE.map(row => row.padEnd(MAP_COLS, " ").split(""));
   enemies = [];
   coins = [];
   particles = [];
   popups = [];
   items = [];
+  fireballs = [];
 
   flagCols = new Set();
   for (let ty = 0; ty < MAP_ROWS; ty++) {
@@ -333,7 +378,7 @@ function initLevel() {
         tiles[ty][tx] = " ";
         enemies.push({
           x: tx * TILE + 4, y: ty * TILE + TILE - 40,
-          w: 40, h: 40, vx: -1.1, vy: 0,
+          w: 40, h: 40, vx: -lv.enemySpeed, vy: 0,
           alive: true, squashTimer: 0,
         });
       } else if (ch === "o") {
@@ -351,14 +396,17 @@ function initLevel() {
     jumpBuffer: 0, // 先行入力: 着地直前に押したジャンプを覚えておくフレーム数
     coyote: 0,     // コヨーテタイム: 足場を離れた直後でもジャンプできるフレーム数
     big: false,    // キノコで大きくなった状態(1回だけダメージに耐えられる)
+    fire: false,   // フラワーでファイアボールが撃てる状態
+    star: 0,       // スターの無敵時間(フレーム)
     invuln: 0,     // ダメージ後の無敵時間(フレーム)
   };
   camera.x = 0;
   camera.y = Math.max(0, WORLD_H - canvas.height);
-  timeLeft = TIME_LIMIT;
+  timeLeft = lv.time;
 }
 
-function resetRun() {
+function resetRun(levelKey) {
+  if (levelKey) currentLevel = levelKey;
   score = 0;
   coinCount = 0;
   lives = START_LIVES;
@@ -416,14 +464,17 @@ function moveAndCollide(body) {
 // ---------- ブロックを下から叩いたとき ----------
 function bumpBlock(tx, ty) {
   const ch = tileAt(tx, ty);
-  if (ch === "M") {
-    // キノコ入りブロック: 叩くとキノコが飛び出して歩き出す
+  if (ch === "M" || ch === "W" || ch === "T") {
+    // アイテム入りブロック: M=キノコ W=フラワー T=スター
     tiles[ty][tx] = "U";
     score += 200;
     sfx.sprout();
+    const type = ch === "M" ? "mushroom" : ch === "W" ? "flower" : "star";
     items.push({
       x: tx * TILE + 4, y: ty * TILE - 40,
-      w: 40, h: 40, vx: 1.5, vy: 0, taken: false,
+      w: 40, h: 40,
+      vx: type === "mushroom" ? 1.5 : type === "star" ? 2.5 : 0, // フラワーは動かない
+      vy: 0, type, taken: false,
     });
   } else if (ch === "?") {
     tiles[ty][tx] = "U";
@@ -450,8 +501,13 @@ function bumpBlock(tx, ty) {
 // ---------- プレイヤーのダメージ・死亡 ----------
 // 大きいときは1回だけ耐えて小さくなる。小さいときはミス。
 function damagePlayer() {
-  if (player.invuln > 0) return;
-  if (player.big) {
+  if (player.invuln > 0 || player.star > 0) return;
+  if (player.fire) {
+    // ファイア → 大きいだけの状態に戻る
+    player.fire = false;
+    player.invuln = 120;
+    sfx.shrink();
+  } else if (player.big) {
     player.big = false;
     player.invuln = 120;
     sfx.shrink();
@@ -498,6 +554,21 @@ function update() {
   if (gameState !== STATE.PLAYING) return;
 
   if (player.invuln > 0) player.invuln--;
+  if (player.star > 0) player.star--;
+
+  // ファイアボール発射
+  if (firePressed) {
+    firePressed = false;
+    if (player.fire && fireballs.length < 2) {
+      sfx.fire();
+      fireballs.push({
+        x: player.x + (player.facing > 0 ? player.w : -16),
+        y: player.y + 12,
+        w: 16, h: 16,
+        vx: 7 * player.facing, vy: 2, life: 110,
+      });
+    }
+  }
 
   // タイマー
   if (frameCount % 60 === 0) {
@@ -575,6 +646,15 @@ function update() {
 
     // プレイヤーとの当たり判定
     if (rectsOverlap(player, e)) {
+      if (player.star > 0) {
+        // スターで無敵中は触れるだけで敵をたおせる
+        e.alive = false;
+        e.squashTimer = 30;
+        score += 300;
+        sfx.stomp();
+        popups.push({ x: e.x + e.w / 2, y: e.y, vy: -3, life: 25, type: "score", text: "300" });
+        continue;
+      }
       const playerBottom = player.y + player.h;
       if (player.vy > 0 && playerBottom - e.y < 24) {
         // 踏みつけ
@@ -591,7 +671,7 @@ function update() {
     }
   }
 
-  // --- キノコの更新と取得 ---
+  // --- アイテムの更新と取得 ---
   for (const it of items) {
     if (it.taken) continue;
     it.hitWall = false;
@@ -600,16 +680,51 @@ function update() {
     if (it.vy > 16) it.vy = 16;
     moveAndCollide(it);
     if (it.hitWall) it.vx = -prevVx;
+    if (it.type === "star" && it.onGround) it.vy = -9; // スターは跳ねまわる
     if (it.y > WORLD_H + 100) { it.taken = true; continue; }
 
     if (rectsOverlap(player, it)) {
       it.taken = true;
       score += 500;
-      sfx.power();
-      popups.push({ x: it.x + it.w / 2, y: it.y, vy: -3, life: 35, type: "score", text: "パワーアップ!" });
-      player.big = true;
+      if (it.type === "star") {
+        player.star = 480; // 8秒間むてき!
+        sfx.star();
+        popups.push({ x: it.x + it.w / 2, y: it.y, vy: -3, life: 35, type: "score", text: "むてき!" });
+      } else if (it.type === "flower") {
+        player.big = true;
+        player.fire = true;
+        sfx.power();
+        popups.push({ x: it.x + it.w / 2, y: it.y, vy: -3, life: 35, type: "score", text: "ファイア!" });
+      } else {
+        player.big = true;
+        sfx.power();
+        popups.push({ x: it.x + it.w / 2, y: it.y, vy: -3, life: 35, type: "score", text: "パワーアップ!" });
+      }
     }
   }
+
+  // --- ファイアボールの更新 ---
+  for (const f of fireballs) {
+    f.hitWall = false;
+    f.vy += GRAVITY * 0.7;
+    if (f.vy > 12) f.vy = 12;
+    moveAndCollide(f);
+    if (f.onGround) f.vy = -7; // 地面で跳ねる
+    if (f.hitWall) f.life = 0;
+    f.life--;
+    if (f.y > WORLD_H + 50) f.life = 0;
+    for (const e of enemies) {
+      if (e.alive && f.life > 0 && rectsOverlap(f, e)) {
+        e.alive = false;
+        e.squashTimer = 30;
+        f.life = 0;
+        score += 200;
+        sfx.stomp();
+        popups.push({ x: e.x + e.w / 2, y: e.y, vy: -3, life: 25, type: "score", text: "200" });
+      }
+    }
+  }
+  fireballs = fireballs.filter(f => f.life > 0);
 
   // --- ゴール判定(旗の列に到達したらクリア) ---
   const ptx = Math.floor((player.x + player.w / 2) / TILE);
@@ -674,12 +789,19 @@ function draw() {
   drawCoins();
   drawItems();
   drawEnemies();
+  drawFireballs();
   if (gameState !== STATE.TITLE) drawPlayer();
   drawParticles();
 
   ctx.restore();
 
   drawHUD();
+
+  // 🔥ボタンはファイア状態のときだけ表示する
+  document.getElementById("touch-fire").classList.toggle(
+    "hidden-btn",
+    !(gameState === STATE.PLAYING && player && player.fire)
+  );
 
   if (gameState === STATE.CLEAR) {
     clearTimer++;
@@ -778,7 +900,11 @@ function drawTiles() {
           ctx.stroke();
           break;
         }
-        case "?": {
+        case "?":
+        case "M":
+        case "W":
+        case "T": {
+          // アイテム入りブロックはどれも?ブロックの見た目(中身はお楽しみ)
           const bounce = Math.sin(frameCount * 0.1) * 2;
           ctx.fillStyle = "#f6a623";
           ctx.fillRect(x, y, TILE, TILE);
@@ -926,6 +1052,59 @@ function drawItems() {
   for (const it of items) {
     if (it.taken) continue;
     const cx = it.x + it.w / 2;
+
+    if (it.type === "star") {
+      // ⭐ スター(くるくる回る)
+      ctx.save();
+      ctx.translate(cx, it.y + it.h / 2);
+      ctx.rotate(Math.sin(frameCount * 0.15) * 0.3);
+      ctx.fillStyle = "#ffd700";
+      ctx.strokeStyle = "#c8960c";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const r = i % 2 === 0 ? 20 : 9;
+        const a = (i * Math.PI) / 5 - Math.PI / 2;
+        ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#333";
+      ctx.beginPath();
+      ctx.arc(-4, 2, 2.2, 0, Math.PI * 2);
+      ctx.arc(4, 2, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      continue;
+    }
+
+    if (it.type === "flower") {
+      // 🌸 ファイアフラワー
+      ctx.strokeStyle = "#2ea44f";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(cx, it.y + it.h);
+      ctx.lineTo(cx, it.y + 18);
+      ctx.stroke();
+      for (let i = 0; i < 6; i++) {
+        const a = (i * Math.PI) / 3 + frameCount * 0.02;
+        ctx.fillStyle = "#ff7043";
+        ctx.beginPath();
+        ctx.ellipse(cx + Math.cos(a) * 11, it.y + 14 + Math.sin(a) * 11, 7, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = "#ffd166";
+      ctx.beginPath();
+      ctx.arc(cx, it.y + 14, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#333";
+      ctx.beginPath();
+      ctx.arc(cx - 3, it.y + 13, 1.8, 0, Math.PI * 2);
+      ctx.arc(cx + 3, it.y + 13, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      continue;
+    }
     // 軸(顔の部分)
     ctx.fillStyle = "#ffe8c9";
     ctx.beginPath();
@@ -949,6 +1128,20 @@ function drawItems() {
     ctx.arc(cx, it.y + it.h * 0.16, 5, 0, Math.PI * 2);
     ctx.arc(cx - 12, it.y + it.h * 0.38, 4, 0, Math.PI * 2);
     ctx.arc(cx + 12, it.y + it.h * 0.38, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawFireballs() {
+  for (const f of fireballs) {
+    const cx = f.x + f.w / 2, cy = f.y + f.h / 2;
+    ctx.fillStyle = "#ffb84d";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 9 + Math.sin(frameCount * 0.6) * 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ff5722";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5.5, 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -1011,6 +1204,11 @@ function drawPlayer() {
   // 当たり判定はそのままに、見た目だけ足元を基準に拡大して描く
   // キノコを取って大きいときはさらに大きく
   const S = p.big ? 1.8 : 1.35;
+  // ファイア状態は服がオレンジになる
+  const suit = p.fire ? "#ff8c00" : "#e63946";
+  // スター無敵中は虹色に光る(終わる直前は点滅)
+  const rainbow = p.star > 0 && (p.star > 90 || Math.floor(frameCount / 6) % 2 === 0);
+  if (rainbow) ctx.filter = `hue-rotate(${(frameCount * 25) % 360}deg) saturate(1.8) brightness(1.15)`;
 
   ctx.save();
   ctx.translate(cx, feetY);
@@ -1038,13 +1236,13 @@ function drawPlayer() {
   ctx.roundRect(-11, p.h - 30, 22, 16, 5);
   ctx.fill();
   // シャツ
-  ctx.fillStyle = "#e63946";
+  ctx.fillStyle = suit;
   ctx.beginPath();
   ctx.roundRect(-12, p.h - 36, 24, 10, 4);
   ctx.fill();
 
   // 腕
-  ctx.strokeStyle = "#e63946";
+  ctx.strokeStyle = suit;
   ctx.lineWidth = 6;
   ctx.beginPath();
   if (jumping) {
@@ -1068,7 +1266,7 @@ function drawPlayer() {
   ctx.save();
   ctx.translate(cx, headY);
   if (p.facing < 0) ctx.scale(-1, 1);
-  ctx.fillStyle = "#e63946";
+  ctx.fillStyle = suit;
   ctx.beginPath();
   ctx.arc(0, 0, headR + 2, Math.PI + 0.45, -0.45);
   ctx.closePath();
@@ -1078,6 +1276,8 @@ function drawPlayer() {
   ctx.roundRect(headR * 0.45, -headR * 0.85, headR * 1.05, headR * 0.3, 4);
   ctx.fill();
   ctx.restore();
+
+  ctx.filter = "none";
 }
 
 function drawParticles() {
@@ -1156,12 +1356,14 @@ document.getElementById("face-input").addEventListener("change", (e) => {
 });
 document.getElementById("face-reset").addEventListener("click", resetFace);
 
-document.getElementById("start-btn").addEventListener("click", () => {
+function startGame(levelKey) {
   titleScreen.classList.add("hidden");
-  resetRun();
+  resetRun(levelKey);
   gameState = STATE.PLAYING;
   startBgm();
-});
+}
+document.getElementById("start-easy-btn").addEventListener("click", () => startGame("easy"));
+document.getElementById("start-normal-btn").addEventListener("click", () => startGame("normal"));
 
 document.getElementById("retry-btn").addEventListener("click", () => {
   document.getElementById("gameover-screen").classList.add("hidden");
