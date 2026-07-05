@@ -163,6 +163,10 @@ html, body {
   position: absolute;
   right: calc(16px + env(safe-area-inset-right, 0px));
   bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
 }
 
 .touch-btn {
@@ -196,6 +200,44 @@ html, body {
 .touch-jump:active,
 .touch-jump.pressed {
   background: rgba(255, 107, 107, 0.8);
+}
+
+.touch-fire {
+  width: 72px;
+  height: 72px;
+  font-size: 30px;
+  background: rgba(255, 152, 0, 0.55);
+}
+
+.touch-fire:active,
+.touch-fire.pressed {
+  background: rgba(255, 152, 0, 0.9);
+}
+
+.touch-btn.hidden-btn {
+  display: none;
+}
+
+/* ---------- 難易度選択 ---------- */
+.level-select {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.btn-easy {
+  background: linear-gradient(180deg, #7ed957, #3fbf4f);
+  color: #fff;
+  box-shadow: 0 5px 0 #1a7a35;
+}
+
+.btn-sub {
+  display: block;
+  font-size: 0.62em;
+  font-weight: normal;
+  opacity: 0.9;
+  margin-top: 2px;
 }
 
 /* ---------- 縦持ちヒント ---------- */
