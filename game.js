@@ -150,6 +150,15 @@ function drawFacePreview() {
 
 // ---------- サウンド (WebAudio) ----------
 let audioCtx = null;
+
+// iOS Safariは「ユーザー操作の中」でしか音を鳴らし始められないので、
+// ボタンが押されたタイミングでAudioContextを作成・再開しておく
+function unlockAudio() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  } catch (e) {}
+}
 function beep(freq, duration, type = "square", volume = 0.15, slide = 0) {
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -194,10 +203,25 @@ window.addEventListener("keyup", (e) => {
   if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") keys.jump = false;
 });
 
+// iOS Safariのピンチズーム・ダブルタップズームを防ぐ
+document.addEventListener("gesturestart", (e) => e.preventDefault());
+document.addEventListener("touchmove", (e) => {
+  if (e.touches.length > 1) e.preventDefault();
+}, { passive: false });
+let lastTouchEnd = 0;
+document.addEventListener("touchend", (e) => {
+  const now = Date.now();
+  if (now - lastTouchEnd < 350 && e.target.tagName !== "BUTTON" && e.target.tagName !== "LABEL") {
+    e.preventDefault();
+  }
+  lastTouchEnd = now;
+}, { passive: false });
+
 function bindTouch(id, key) {
   const el = document.getElementById(id);
   const down = (e) => {
     e.preventDefault();
+    unlockAudio();
     if (key === "jump" && !keys.jump) jumpPressed = true;
     keys[key] = true;
   };
@@ -876,12 +900,14 @@ document.getElementById("face-input").addEventListener("change", (e) => {
 document.getElementById("face-reset").addEventListener("click", resetFace);
 
 document.getElementById("start-btn").addEventListener("click", () => {
+  unlockAudio();
   titleScreen.classList.add("hidden");
   resetRun();
   gameState = STATE.PLAYING;
 });
 
 document.getElementById("retry-btn").addEventListener("click", () => {
+  unlockAudio();
   document.getElementById("gameover-screen").classList.add("hidden");
   resetRun();
   gameState = STATE.PLAYING;

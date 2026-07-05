@@ -11,12 +11,21 @@ html, body {
   font-family: "Hiragino Maru Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
   overflow: hidden;
   touch-action: none;
+  /* iOS Safariで長押しメニューやタップ時のハイライトを出さない */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  /* iOSのアドレスバーの伸び縮みで高さがずれないようにする */
+  position: fixed;
+  inset: 0;
 }
 
 #game-wrap {
   position: relative;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -25,6 +34,8 @@ html, body {
 #game {
   width: min(100vw, calc(100vh * 16 / 9));
   height: min(100vh, calc(100vw * 9 / 16));
+  width: min(100dvw, calc(100dvh * 16 / 9));
+  height: min(100dvh, calc(100dvw * 9 / 16));
   background: #5c94fc;
   image-rendering: auto;
   display: block;
@@ -142,16 +153,16 @@ html, body {
 
 .touch-left {
   position: absolute;
-  left: 16px;
-  bottom: 20px;
+  left: calc(16px + env(safe-area-inset-left, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   display: flex;
   gap: 14px;
 }
 
 .touch-right {
   position: absolute;
-  right: 16px;
-  bottom: 20px;
+  right: calc(16px + env(safe-area-inset-right, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
 }
 
 .touch-btn {
@@ -178,4 +189,25 @@ html, body {
   height: 90px;
   font-size: 18px;
   background: rgba(255, 107, 107, 0.5);
+}
+
+/* ---------- 縦持ちヒント ---------- */
+#rotate-hint {
+  display: none;
+  position: absolute;
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 14px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  z-index: 20;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate-hint { display: block; }
 }

@@ -2,8 +2,16 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>スーパーフェイスラン</title>
+<!-- iPhone: ホーム画面に追加したときの設定 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="フェイスラン">
+<meta name="theme-color" content="#5c94fc">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -47,6 +55,9 @@
     <button class="btn btn-primary" id="clear-retry-btn">もういちど</button>
     <button class="btn btn-ghost" id="clear-title-btn">タイトルへ</button>
   </div>
+
+  <!-- 縦持ちのときのヒント -->
+  <div id="rotate-hint">📱 よこ向きにすると遊びやすいよ！</div>
 
   <!-- モバイル用タッチ操作 -->
   <div id="touch-controls">
