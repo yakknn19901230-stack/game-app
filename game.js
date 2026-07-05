@@ -184,6 +184,61 @@ const sfx = {
   bump:  () => beep(160, 0.08, "square", 0.1),
 };
 
+// ---------- BGM (WebAudioで生成する8bit風ループ曲・オリジナル) ----------
+// MIDIノート番号で書いた2小節ループ(C→Am→F→Gの明るい進行)。0は休符。
+const BGM_STEP = 0.125; // 16分音符1つの長さ(秒) ≒ テンポ120
+const BGM_MELODY = [
+  76, 0, 79, 0, 81, 0, 79, 76, 74, 0, 76, 0, 72, 0, 74, 76,
+  77, 0, 81, 0, 79, 0, 77, 74, 76, 0, 74, 0, 72, 0, 0, 0,
+];
+const BGM_BASS = [
+  48, 0, 55, 0, 48, 0, 55, 0, 45, 0, 52, 0, 45, 0, 52, 0,
+  41, 0, 48, 0, 41, 0, 48, 0, 43, 0, 50, 0, 43, 0, 50, 0,
+];
+const bgm = { playing: false, timer: null, step: 0, nextTime: 0 };
+
+function midiToFreq(n) { return 440 * Math.pow(2, (n - 69) / 12); }
+
+function bgmPlayNote(midi, time, dur, type, vol) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.value = midiToFreq(midi);
+  gain.gain.setValueAtTime(vol, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(time);
+  osc.stop(time + dur + 0.02);
+}
+
+// 少し先の音符まで予約しておく方式(setIntervalのブレの影響を受けない)
+function bgmTick() {
+  if (!bgm.playing || !audioCtx) return;
+  while (bgm.nextTime < audioCtx.currentTime + 0.2) {
+    const i = bgm.step % BGM_MELODY.length;
+    if (BGM_MELODY[i]) bgmPlayNote(BGM_MELODY[i], bgm.nextTime, BGM_STEP * 0.95, "square", 0.04);
+    if (BGM_BASS[i]) bgmPlayNote(BGM_BASS[i], bgm.nextTime, BGM_STEP * 1.8, "triangle", 0.07);
+    bgm.step++;
+    bgm.nextTime += BGM_STEP;
+  }
+}
+
+function startBgm() {
+  try {
+    unlockAudio();
+    if (!audioCtx || bgm.playing) return;
+    bgm.playing = true;
+    bgm.step = 0;
+    bgm.nextTime = audioCtx.currentTime + 0.1;
+    bgm.timer = setInterval(bgmTick, 60);
+  } catch (e) {}
+}
+
+function stopBgm() {
+  bgm.playing = false;
+  if (bgm.timer) { clearInterval(bgm.timer); bgm.timer = null; }
+}
+
 // ---------- 入力 ----------
 const keys = { left: false, right: false, jump: false };
 let jumpPressed = false; // 押した瞬間だけtrue
@@ -286,6 +341,8 @@ function initLevel() {
     w: 36, h: 46, vx: 0, vy: 0,
     onGround: false, facing: 1, runFrame: 0,
     deadTimer: 0,
+    jumpBuffer: 0, // 先行入力: 着地直前に押したジャンプを覚えておくフレーム数
+    coyote: 0,     // コヨーテタイム: 足場を離れた直後でもジャンプできるフレーム数
   };
   camera.x = 0;
   camera.y = Math.max(0, WORLD_H - canvas.height);
@@ -378,6 +435,7 @@ function killPlayer() {
   gameState = STATE.DYING;
   player.deadTimer = 0;
   player.vy = -11;
+  stopBgm();
   sfx.die();
 }
 
@@ -390,6 +448,7 @@ function afterDeath() {
   } else {
     initLevel();
     gameState = STATE.PLAYING;
+    startBgm();
   }
 }
 
@@ -421,11 +480,25 @@ function update() {
   player.vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, player.vx));
   if (Math.abs(player.vx) < 0.05) player.vx = 0;
 
-  if (jumpPressed && player.onGround) {
-    player.vy = JUMP_POWER;
-    sfx.jump();
+  // ジャンプ: 押した瞬間に反応させるため、先行入力とコヨーテタイムを持たせる。
+  // 着地の少し前に押してもすぐ跳べて、足場から落ちた直後でも跳べる。
+  if (jumpPressed) {
+    player.jumpBuffer = 8;
+    jumpPressed = false;
   }
-  jumpPressed = false;
+  if (player.onGround) player.coyote = 7;
+  else if (player.coyote > 0) player.coyote--;
+
+  if (player.jumpBuffer > 0) {
+    player.jumpBuffer--;
+    if (player.coyote > 0) {
+      player.vy = JUMP_POWER;
+      player.coyote = 0;
+      player.jumpBuffer = 0;
+      player.onGround = false;
+      sfx.jump();
+    }
+  }
   // ジャンプボタンを離すと上昇が弱まる(可変ジャンプ)
   if (!keys.jump && player.vy < -4) player.vy = -4;
 
@@ -490,6 +563,7 @@ function update() {
   if (flagCols.has(ptx)) {
     gameState = STATE.CLEAR;
     score += timeLeft * 10;
+    stopBgm();
     sfx.clear();
     clearTimer = 0;
     setTimeout(() => {
@@ -927,17 +1001,17 @@ document.getElementById("face-input").addEventListener("change", (e) => {
 document.getElementById("face-reset").addEventListener("click", resetFace);
 
 document.getElementById("start-btn").addEventListener("click", () => {
-  unlockAudio();
   titleScreen.classList.add("hidden");
   resetRun();
   gameState = STATE.PLAYING;
+  startBgm();
 });
 
 document.getElementById("retry-btn").addEventListener("click", () => {
-  unlockAudio();
   document.getElementById("gameover-screen").classList.add("hidden");
   resetRun();
   gameState = STATE.PLAYING;
+  startBgm();
 });
 document.getElementById("to-title-btn").addEventListener("click", () => {
   document.getElementById("gameover-screen").classList.add("hidden");
@@ -948,6 +1022,7 @@ document.getElementById("clear-retry-btn").addEventListener("click", () => {
   document.getElementById("clear-screen").classList.add("hidden");
   resetRun();
   gameState = STATE.PLAYING;
+  startBgm();
 });
 document.getElementById("clear-title-btn").addEventListener("click", () => {
   document.getElementById("clear-screen").classList.add("hidden");
