@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>スーパーフェイスラン</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="game-wrap">
+  <canvas id="game" width="960" height="540"></canvas>
+
+  <!-- タイトル画面 -->
+  <div id="title-screen" class="overlay">
+    <h1>スーパーフェイスラン</h1>
+    <p class="subtitle">きみの顔が主人公になる横スクロールアクション！</p>
+
+    <div class="face-setup">
+      <div class="face-preview">
+        <canvas id="face-preview-canvas" width="120" height="120"></canvas>
+      </div>
+      <label class="btn btn-secondary" for="face-input">顔写真をえらぶ</label>
+      <input type="file" id="face-input" accept="image/*" hidden>
+      <button class="btn btn-ghost" id="face-reset">デフォルトに戻す</button>
+    </div>
+
+    <button class="btn btn-primary" id="start-btn">ゲームスタート</button>
+
+    <div class="howto">
+      <p>← → / A D … 移動　　スペース / ↑ / W … ジャンプ</p>
+      <p>敵は上から踏んでたおそう！ コインを集めてゴールの旗を目指せ！</p>
+    </div>
+  </div>
+
+  <!-- ゲームオーバー画面 -->
+  <div id="gameover-screen" class="overlay hidden">
+    <h1>ゲームオーバー</h1>
+    <p id="gameover-score" class="subtitle"></p>
+    <button class="btn btn-primary" id="retry-btn">もういちど</button>
+    <button class="btn btn-ghost" id="to-title-btn">タイトルへ</button>
+  </div>
+
+  <!-- クリア画面 -->
+  <div id="clear-screen" class="overlay hidden">
+    <h1>ゴール！🎉</h1>
+    <p id="clear-score" class="subtitle"></p>
+    <button class="btn btn-primary" id="clear-retry-btn">もういちど</button>
+    <button class="btn btn-ghost" id="clear-title-btn">タイトルへ</button>
+  </div>
+
+  <!-- モバイル用タッチ操作 -->
+  <div id="touch-controls">
+    <div class="touch-left">
+      <button class="touch-btn" id="touch-left">◀</button>
+      <button class="touch-btn" id="touch-right">▶</button>
+    </div>
+    <div class="touch-right">
+      <button class="touch-btn touch-jump" id="touch-jump">JUMP</button>
+    </div>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
