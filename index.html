@@ -32,9 +32,12 @@
       <button class="btn btn-ghost" id="face-reset">デフォルトに戻す</button>
     </div>
 
+    <p class="select-label">ステージをえらんでね(だんだん難しくなるよ)</p>
     <div class="level-select">
-      <button class="btn btn-easy" id="start-easy-btn">🌱 かんたん<span class="btn-sub">3さいから・おちる穴なし</span></button>
-      <button class="btn btn-primary" id="start-normal-btn">🔥 ぼうけん<span class="btn-sub">穴や敵がいっぱい</span></button>
+      <button class="btn btn-stage stage-1" id="stage-btn-0">🌱 ステージ1<span class="btn-sub">かんたん・おちる穴なし</span></button>
+      <button class="btn btn-stage stage-2" id="stage-btn-1">🌼 ステージ2<span class="btn-sub">はらっぱ・小さな穴</span></button>
+      <button class="btn btn-stage stage-3" id="stage-btn-2">🌊 ステージ3<span class="btn-sub">ぼうけん・敵いっぱい</span></button>
+      <button class="btn btn-stage stage-4" id="stage-btn-3">🌋 ステージ4<span class="btn-sub">ちょうせん・むずかしい!</span></button>
     </div>
 
     <div class="howto">
@@ -53,9 +56,10 @@
 
   <!-- クリア画面 -->
   <div id="clear-screen" class="overlay hidden">
-    <h1>ゴール！🎉</h1>
+    <h1 id="clear-title">ゴール！🎉</h1>
     <p id="clear-score" class="subtitle"></p>
-    <button class="btn btn-primary" id="clear-retry-btn">もういちど</button>
+    <button class="btn btn-primary" id="next-stage-btn">つぎのステージへ ▶</button>
+    <button class="btn btn-secondary" id="clear-retry-btn">もういちど</button>
     <button class="btn btn-ghost" id="clear-title-btn">タイトルへ</button>
   </div>
 

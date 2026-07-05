@@ -26,9 +26,9 @@ const ctx = canvas.getContext("2d");
 // F : ゴールの旗   C : ゴールの城(かざり)
 // ※ マップは scratchpad/mapgen.js で生成し、全要素に届くこと・
 //    詰む地形がないことを機械的に検証してある
-const LEVELS = {
-  easy: {
-    name: "かんたん",
+const LEVELS = [
+  {
+    name: "かんたん", icon: "🌱",
     time: 500,
     enemySpeed: 0.6, // 小さい子向けに敵はゆっくり
     map: [
@@ -48,8 +48,29 @@ const LEVELS = {
 "#########################################################################################################################################################################################################################################################################################################################################",
     ],
   },
-  normal: {
-    name: "ぼうけん",
+  {
+    name: "はらっぱ", icon: "🌼",
+    time: 480,
+    enemySpeed: 0.9,
+    map: [
+"                                                                                                                                                                                                                                                                                                                                                                                              ",
+"                                                                                                                                                                                                                                                                                                                                                                                              ",
+"                                                                                                                                                                                                                                                                                                                                                                                              ",
+"                                                                                                                                                                                                                                                                                                                                                                                              ",
+"                                                                                                                                                                                                                                                                                                                                                                                              ",
+"                               ooo                                           ooo                                         ooo                                    ooo                                                ooo                                    ooo                                         ooo                                           ooo                       F               ",
+"                                                                                                                                                                                                                                                                                                                                                                                              ",
+"                                                  ooo                                                                                                                              ooo                                                                                                                                   ooo                                                                  ",
+"                              BB?BB        oooo                             BB?BB        oooo                           BB?BB        oooo                      BB?BB        oooo                                  BB?BB        oooo                      BB?BB        oooo                           BB?BB        oooo                             BB?BB        oooo                          ",
+"      ?M?    ooo                                   S     ?T?    ooo   PP                        ???    ooo                                  ?W?    ooo   PP                         S     ???    ooo                                  ?M?    ooo   PP                        ?T?    ooo                                   S     ???    ooo   PP                        oooo                   ",
+"                   PP                  g          SSS                 PP             g                       PP                  g                       PP             g          SSS                 PP                  g                       PP             g                       PP                  g          SSS                 PP             g                      C          ",
+"#########################  ########################################################################################  ########################################################################################  #################################################################################  ############################################################################################",
+"#########################  ########################################################################################  ########################################################################################  #################################################################################  ############################################################################################",
+"#########################  ########################################################################################  ########################################################################################  #################################################################################  ############################################################################################",
+    ],
+  },
+  {
+    name: "ぼうけん", icon: "🌊",
     time: 450,
     enemySpeed: 1.1,
     map: [
@@ -69,11 +90,32 @@ const LEVELS = {
 "##########################  #####################################  #########################################  ################################  #####################   #############################  #####################################  #########################################  ################################  #####################   #############################  #####################################  #########################################  ################################  #####################   ###############################",
     ],
   },
-};
-let currentLevel = "normal";
+  {
+    name: "ちょうせん", icon: "🌋",
+    time: 450,
+    enemySpeed: 1.5,
+    map: [
+"                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ",
+"                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ",
+"                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ",
+"                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ",
+"                                                                                                        ooo                          ooo                                                                                                                 ooo                          ooo                                                                                                                 ooo                          ooo                                     ",
+"                            ooo                                   W                                                                                                          ooo                                   T                                                                                                          ooo                                   ?                                                                                          F               ",
+"                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ",
+"                                                                         oo                            BB?BB                        BB?BB                                                                                 oo                            BB?BB                        BBMBB                                                                                 oo                            BB?BB                        BB?BB                                    ",
+"                           BB?BB                                BB?BB                                                            SS                                         BB?BB                                BB?BB                                                            SS                                         BB?BB                                BB?BB                                                            SS                                          ",
+"      BBMBB    PP                           PP       PP                                          PP                            SSSS                    BB?BB    PP                           PP       PP                                          PP                            SSSS                    BBWBB    PP                           PP       PP                                          PP                            SSSS                    ooo                   ",
+"               PP                   g g g   PP    g  PP                             g g    PP    PP                  g g g   SSSSSS                             PP                   g g g   PP    g  PP                             g g    PP    PP                  g g g   SSSSSS                             PP                   g g g   PP    g  PP                             g g    PP    PP                  g g g   SSSSSS                               C          ",
+"#####################   ###################################  #################   ###############################  #############################   ####################   ###################################  #################   ###############################  #############################   ####################   ###################################  #################   ###############################  #############################   ###########################",
+"#####################   ###################################  #################   ###############################  #############################   ####################   ###################################  #################   ###############################  #############################   ####################   ###################################  #################   ###############################  #############################   ###########################",
+"#####################   ###################################  #################   ###############################  #############################   ####################   ###################################  #################   ###############################  #############################   ####################   ###################################  #################   ###############################  #############################   ###########################",
+    ],
+  },
+];
+let currentLevel = 0;
 
 // レベルによってサイズが変わるため initLevel() で設定する
-let MAP_SOURCE = LEVELS.normal.map;
+let MAP_SOURCE = LEVELS[0].map;
 let MAP_COLS = 0;
 let MAP_ROWS = 0;
 let tiles = [];
@@ -222,17 +264,43 @@ const sfx = {
 };
 
 // ---------- BGM (WebAudioで生成する8bit風ループ曲・オリジナル) ----------
-// MIDIノート番号で書いた2小節ループ(C→Am→F→Gの明るい進行)。0は休符。
-const BGM_STEP = 0.125; // 16分音符1つの長さ(秒) ≒ テンポ120
-const BGM_MELODY = [
-  76, 0, 79, 0, 81, 0, 79, 76, 74, 0, 76, 0, 72, 0, 74, 76,
-  77, 0, 81, 0, 79, 0, 77, 74, 76, 0, 74, 0, 72, 0, 0, 0,
-];
-const BGM_BASS = [
-  48, 0, 55, 0, 48, 0, 55, 0, 45, 0, 52, 0, 45, 0, 52, 0,
-  41, 0, 48, 0, 41, 0, 48, 0, 43, 0, 50, 0, 43, 0, 50, 0,
-];
-const bgm = { playing: false, timer: null, step: 0, nextTime: 0 };
+// MIDIノート番号で書いた2小節ループ。0は休符。
+// normal: のんびり明るい曲(C→Am→F→G)
+// star  : スター無敵中のアップテンポ曲(速い+高音+ベース連打)
+const BGM_TRACKS = {
+  normal: {
+    step: 0.125, // 16分音符の長さ(秒) ≒ テンポ120
+    melody: [
+      76, 0, 79, 0, 81, 0, 79, 76, 74, 0, 76, 0, 72, 0, 74, 76,
+      77, 0, 81, 0, 79, 0, 77, 74, 76, 0, 74, 0, 72, 0, 0, 0,
+    ],
+    bass: [
+      48, 0, 55, 0, 48, 0, 55, 0, 45, 0, 52, 0, 45, 0, 52, 0,
+      41, 0, 48, 0, 41, 0, 48, 0, 43, 0, 50, 0, 43, 0, 50, 0,
+    ],
+    mVol: 0.04, bVol: 0.07,
+  },
+  star: {
+    step: 0.085, // ぐっと速く ≒ テンポ176
+    melody: [
+      88, 0, 91, 88, 0, 91, 0, 93, 91, 0, 95, 93, 0, 91, 0, 88,
+      89, 0, 93, 89, 0, 93, 0, 96, 95, 93, 91, 89, 88, 86, 84, 0,
+    ],
+    bass: [
+      48, 48, 0, 48, 55, 0, 48, 0, 45, 45, 0, 45, 52, 0, 45, 0,
+      41, 41, 0, 41, 53, 0, 41, 0, 43, 43, 0, 43, 50, 0, 43, 0,
+    ],
+    mVol: 0.05, bVol: 0.08,
+  },
+};
+const bgm = { playing: false, timer: null, step: 0, nextTime: 0, mode: "normal" };
+
+// 無敵になった/終わったときに曲を切り替える
+function setBgmMode(mode) {
+  if (bgm.mode === mode) return;
+  bgm.mode = mode;
+  bgm.step = 0; // 曲の頭から
+}
 
 function midiToFreq(n) { return 440 * Math.pow(2, (n - 69) / 12); }
 
@@ -252,11 +320,12 @@ function bgmPlayNote(midi, time, dur, type, vol) {
 function bgmTick() {
   if (!bgm.playing || !audioCtx) return;
   while (bgm.nextTime < audioCtx.currentTime + 0.2) {
-    const i = bgm.step % BGM_MELODY.length;
-    if (BGM_MELODY[i]) bgmPlayNote(BGM_MELODY[i], bgm.nextTime, BGM_STEP * 0.95, "square", 0.04);
-    if (BGM_BASS[i]) bgmPlayNote(BGM_BASS[i], bgm.nextTime, BGM_STEP * 1.8, "triangle", 0.07);
+    const tr = BGM_TRACKS[bgm.mode];
+    const i = bgm.step % tr.melody.length;
+    if (tr.melody[i]) bgmPlayNote(tr.melody[i], bgm.nextTime, tr.step * 0.95, "square", tr.mVol);
+    if (tr.bass[i]) bgmPlayNote(tr.bass[i], bgm.nextTime, tr.step * 1.8, "triangle", tr.bVol);
     bgm.step++;
-    bgm.nextTime += BGM_STEP;
+    bgm.nextTime += tr.step;
   }
 }
 
@@ -266,6 +335,7 @@ function startBgm() {
     if (!audioCtx || bgm.playing) return;
     bgm.playing = true;
     bgm.step = 0;
+    bgm.mode = "normal";
     bgm.nextTime = audioCtx.currentTime + 0.1;
     bgm.timer = setInterval(bgmTick, 60);
   } catch (e) {}
@@ -406,7 +476,7 @@ function initLevel() {
 }
 
 function resetRun(levelKey) {
-  if (levelKey) currentLevel = levelKey;
+  if (levelKey !== undefined) currentLevel = levelKey;
   score = 0;
   coinCount = 0;
   lives = START_LIVES;
@@ -556,6 +626,7 @@ function update() {
   if (player.invuln > 0) player.invuln--;
   if (player.star > 0) {
     player.star--;
+    if (player.star === 0) setBgmMode("normal"); // 無敵が終わったら曲を戻す
     // 無敵中はキラキラの粒をまき散らす
     if (frameCount % 4 === 0) {
       particles.push({
@@ -702,6 +773,7 @@ function update() {
       score += 500;
       if (it.type === "star") {
         player.star = 1200; // 20秒間むてき!
+        setBgmMode("star");
         sfx.star();
         popups.push({ x: it.x + it.w / 2, y: it.y, vy: -3, life: 35, type: "score", text: "むてき!" });
       } else if (it.type === "flower") {
@@ -749,8 +821,12 @@ function update() {
     sfx.clear();
     clearTimer = 0;
     setTimeout(() => {
+      const isLast = currentLevel >= LEVELS.length - 1;
+      document.getElementById("clear-title").textContent =
+        isLast ? "ぜんぶクリア!すごい!🏆" : `ステージ${currentLevel + 1} クリア!🎉`;
       document.getElementById("clear-score").textContent =
         `スコア: ${score}　コイン: ${coinCount}　残りタイム: ${timeLeft}`;
+      document.getElementById("next-stage-btn").style.display = isLast ? "none" : "";
       document.getElementById("clear-screen").classList.remove("hidden");
     }, 1200);
   }
@@ -1349,7 +1425,7 @@ function drawHUD() {
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,0.35)";
   ctx.beginPath();
-  ctx.roundRect(14, 12, 420, 46, 12);
+  ctx.roundRect(14, 12, 540, 46, 12);
   ctx.fill();
 
   ctx.fillStyle = "#fff";
@@ -1374,6 +1450,8 @@ function drawHUD() {
   ctx.fillText(`SCORE ${score}`, 230, 36);
   ctx.fillStyle = timeLeft <= 30 ? "#ff8080" : "#fff";
   ctx.fillText(`⏱ ${timeLeft}`, 380, 36);
+  ctx.fillStyle = "#ffd166";
+  ctx.fillText(`${LEVELS[currentLevel].icon} ST${currentLevel + 1}`, 468, 36);
   ctx.restore();
 }
 
@@ -1398,8 +1476,14 @@ function startGame(levelKey) {
   gameState = STATE.PLAYING;
   startBgm();
 }
-document.getElementById("start-easy-btn").addEventListener("click", () => startGame("easy"));
-document.getElementById("start-normal-btn").addEventListener("click", () => startGame("normal"));
+LEVELS.forEach((lv, i) => {
+  document.getElementById(`stage-btn-${i}`).addEventListener("click", () => startGame(i));
+});
+
+document.getElementById("next-stage-btn").addEventListener("click", () => {
+  document.getElementById("clear-screen").classList.add("hidden");
+  startGame(Math.min(currentLevel + 1, LEVELS.length - 1));
+});
 
 document.getElementById("retry-btn").addEventListener("click", () => {
   document.getElementById("gameover-screen").classList.add("hidden");
