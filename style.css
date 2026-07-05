@@ -218,19 +218,29 @@ html, body {
   display: none;
 }
 
-/* ---------- 難易度選択 ---------- */
+/* ---------- ステージ選択 ---------- */
+.select-label {
+  font-size: clamp(12px, 2vw, 16px);
+  opacity: 0.85;
+  margin-bottom: -6px;
+}
+
 .level-select {
-  display: flex;
-  gap: 18px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(150px, 220px));
+  gap: 12px;
   justify-content: center;
 }
 
-.btn-easy {
-  background: linear-gradient(180deg, #7ed957, #3fbf4f);
+.btn-stage {
+  padding: 10px 16px;
   color: #fff;
-  box-shadow: 0 5px 0 #1a7a35;
 }
+
+.stage-1 { background: linear-gradient(180deg, #7ed957, #3fbf4f); box-shadow: 0 5px 0 #1a7a35; }
+.stage-2 { background: linear-gradient(180deg, #ffd166, #f4a261); box-shadow: 0 5px 0 #b07d29; color: #4a2b00; }
+.stage-3 { background: linear-gradient(180deg, #64b5f6, #1e88e5); box-shadow: 0 5px 0 #0d47a1; }
+.stage-4 { background: linear-gradient(180deg, #ff6b6b, #e63946); box-shadow: 0 5px 0 #a4161a; }
 
 .btn-sub {
   display: block;
