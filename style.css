@@ -250,6 +250,11 @@ html, body {
   margin-top: 2px;
 }
 
+#mode-back-btn {
+  grid-column: 1 / -1;
+  justify-self: center;
+}
+
 /* ---------- 縦持ちヒント ---------- */
 #rotate-hint {
   display: none;
