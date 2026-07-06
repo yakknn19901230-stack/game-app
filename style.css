@@ -241,6 +241,14 @@ html, body {
 .stage-2 { background: linear-gradient(180deg, #ffd166, #f4a261); box-shadow: 0 5px 0 #b07d29; color: #4a2b00; }
 .stage-3 { background: linear-gradient(180deg, #64b5f6, #1e88e5); box-shadow: 0 5px 0 #0d47a1; }
 .stage-4 { background: linear-gradient(180deg, #ff6b6b, #e63946); box-shadow: 0 5px 0 #a4161a; }
+.stage-oni {
+  grid-column: 1 / -1;
+  justify-self: center;
+  min-width: 60%;
+  background: linear-gradient(180deg, #6d28a8, #2d0b45);
+  box-shadow: 0 5px 0 #17052a, 0 0 18px rgba(160, 60, 255, 0.55);
+  border: 2px solid #a04cff;
+}
 
 .btn-sub {
   display: block;
