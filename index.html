@@ -32,12 +32,17 @@
       <button class="btn btn-ghost" id="face-reset">デフォルトに戻す</button>
     </div>
 
-    <p class="select-label">ステージをえらんでね(だんだん難しくなるよ)</p>
-    <div class="level-select">
-      <button class="btn btn-stage stage-1" id="stage-btn-0">🌱 ステージ1<span class="btn-sub">かんたん・おちる穴なし</span></button>
-      <button class="btn btn-stage stage-2" id="stage-btn-1">🌼 ステージ2<span class="btn-sub">はらっぱ・小さな穴</span></button>
-      <button class="btn btn-stage stage-3" id="stage-btn-2">🌊 ステージ3<span class="btn-sub">ぼうけん・敵いっぱい</span></button>
-      <button class="btn btn-stage stage-4" id="stage-btn-3">🌋 ステージ4<span class="btn-sub">ちょうせん・むずかしい!</span></button>
+    <p class="select-label" id="select-label">モードをえらんでね</p>
+    <div class="level-select" id="mode-select">
+      <button class="btn btn-stage stage-1" id="mode-easy-btn">👶 かんたんモード<span class="btn-sub">3さいから・おちる穴なし</span></button>
+      <button class="btn btn-stage stage-4" id="mode-hard-btn">🔥 むずかしいモード<span class="btn-sub">穴や敵がいっぱい</span></button>
+    </div>
+    <div class="level-select" id="level-select" style="display: none">
+      <button class="btn btn-stage stage-1" id="lv-btn-0">🌸 レベル1<span class="btn-sub">はなばたけ</span></button>
+      <button class="btn btn-stage stage-2" id="lv-btn-1">🌇 レベル2<span class="btn-sub">ゆうやけ</span></button>
+      <button class="btn btn-stage stage-3" id="lv-btn-2">🌊 レベル3<span class="btn-sub">うみべ</span></button>
+      <button class="btn btn-stage stage-4" id="lv-btn-3">🌋 レベル4<span class="btn-sub">かざん</span></button>
+      <button class="btn btn-ghost" id="mode-back-btn">← モードにもどる</button>
     </div>
 
     <div class="howto">
